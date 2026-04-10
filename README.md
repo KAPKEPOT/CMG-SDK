@@ -1,5 +1,9 @@
 # cipher-gateway-python
 
+[![PyPI version](https://img.shields.io/pypi/v/cipher-gateway.svg)](https://pypi.org/project/cipher-gateway/)
+[![Python](https://img.shields.io/pypi/pyversions/cipher-gateway.svg)](https://pypi.org/project/cipher-gateway/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Official Python SDK for the **Cipher MT5 Gateway (CMG)** — a self-hosted bridge between your application and MetaTrader 5.
 
 Built and maintained by [CipherBridge](https://cipherbridge.cloud).
@@ -17,9 +21,9 @@ Your App (Python)
       ▼
 CMG  (Rust — your server)
       │
-      │  TCP
+      │  WebSocket
       ▼
-CMB  (C++ DLL + MQL5)
+CMB  (C++ DLL + MQL5 EA)
       │
       ▼
 MT5 Terminal → Broker
@@ -32,18 +36,24 @@ This SDK handles all communication with CMG so you never write raw HTTP calls.
 ## Installation
 
 ```bash
+pip install cipher-gateway
+```
+
+Or install the latest development version directly from GitHub:
+
+```bash
 pip install git+https://github.com/ciphertrade/cipher-gateway-python.git
 ```
 
-Or clone and install locally:
+Or clone and install locally for development:
 
 ```bash
 git clone https://github.com/ciphertrade/cipher-gateway-python.git
 cd cipher-gateway-python
-pip install -e .
+pip install -e ".[dev]"
 ```
 
-**Requirements:** Python 3.10+, `httpx`, `websockets`
+**Requirements:** Python 3.10+
 
 ---
 
@@ -75,8 +85,8 @@ async def main():
         )
         print(f"account_id: {account.account_id}")
 
-        # Wait for MT5 to connect (10–30 seconds)
-        await client.wait_for_active(account.account_id, timeout=60)
+        # Wait for MT5 to connect — up to 180s (Windows VPS cold start takes 2–4 min)
+        await client.wait_for_active(account.account_id, timeout=180)
         print("MT5 connected!")
 
     # 3. Trade — use api_key + account_id from now on, credentials never needed again
@@ -97,7 +107,7 @@ asyncio.run(main())
 CMG owns your MT5 credentials. The SDK reflects this:
 
 ```
-Step 1 — Register (one time)
+Step 1 — Register (one time per user)
   create_user()        → returns api_key + gateway_user_id  (store these)
   create_account()     → returns account_id                 (store this)
   wait_for_active()    → confirms MT5 is connected
@@ -110,9 +120,12 @@ MT5 login, password, server — never needed again after Step 1.
 ```
 
 Store only these three values per user in your database:
-- `gateway_user_id`
-- `gateway_api_key`
-- `gateway_account_id`
+
+| Field | Description |
+|---|---|
+| `gateway_user_id` | Identifies the user on the gateway |
+| `gateway_api_key` | Authenticates every request |
+| `gateway_account_id` | Identifies which MT5 account to act on |
 
 ---
 
@@ -125,11 +138,11 @@ config = GatewayConfig(
     host="gateway.yourdomain.com",  # CMG hostname or IP
     port=443,                        # 443 for SSL, 8080 for plain HTTP
     use_ssl=True,                    # Must match your nginx/proxy setup
-    api_key_header="X-API-Key",      # Header name CMG expects
+    api_key_header="X-API-Key",      # Header name CMG expects (default is fine)
     connect_timeout=10.0,            # Seconds to establish connection
-    request_timeout=30.0,            # Seconds to wait for response
+    request_timeout=30.0,            # Seconds to wait for a response
     ws_reconnect_delay=5.0,          # Seconds between WebSocket reconnect attempts
-    max_reconnect_attempts=5,        # Max WebSocket reconnect attempts
+    max_reconnect_attempts=5,        # Max WebSocket reconnect attempts before error
 )
 ```
 
@@ -138,16 +151,18 @@ config = GatewayConfig(
 ## Client Modes
 
 ### Admin client — no authentication required
+
 Used only for `health_check()` and `create_user()`.
 
 ```python
 async with CipherGatewayClient.admin(config) as client:
-    healthy = await client.health_check()
+    healthy    = await client.health_check()
     user_creds = await client.create_user()
 ```
 
 ### User client — authenticated
-Used for all trading operations.
+
+Used for all trading and account operations.
 
 ```python
 async with CipherGatewayClient.for_user(config, api_key="your-api-key") as client:
@@ -167,7 +182,7 @@ healthy = await client.health_check()  # → bool
 ### User Management
 
 ```python
-# Create a new gateway user
+# Create a new gateway user (admin client, no auth required)
 user_creds = await client.create_user()
 # user_creds.gateway_user_id  — store in DB
 # user_creds.api_key           — store in DB
@@ -181,22 +196,23 @@ account = await client.create_account(
     mt5_login="12345678",
     mt5_password="password",
     mt5_server="ICMarkets-Demo",
-    region="eu",        # optional
+    region="eu",        # optional — route to a specific node region
 )
 # account.account_id  — store in DB
 
 # Wait for MT5 connection to become active
-await client.wait_for_active(account.account_id, timeout=60)
+# timeout=180 — Windows VPS cold start takes 2–4 minutes
+await client.wait_for_active(account.account_id, timeout=180)
 
 # Check status manually
 status = await client.get_account_status(account.account_id)
 # status["status"]     — "active", "connecting", "login_failed", "deleted"
 # status["last_error"] — error message if login_failed
 
-# List all accounts
+# List all accounts for this user
 accounts = await client.get_accounts()
 
-# Pause / resume trading
+# Pause / resume trading (keeps MT5 connected, blocks new orders)
 await client.pause_account(account.account_id)
 await client.resume_account(account.account_id)
 
@@ -218,7 +234,7 @@ info = await client.get_account_info()
 # info.leverage     → int
 # info.currency     → str  ("USD", "EUR", ...)
 # info.profit       → float
-# info.margin_level → float  (computed property, %)
+# info.margin_level → float  (computed property — margin/equity %)
 ```
 
 ### Positions
@@ -229,11 +245,11 @@ positions = await client.get_positions()
 for p in positions:
     print(p.ticket, p.symbol, p.side, p.volume, p.profit)
 
-# Close a position
+# Close a position (full or partial)
 result = await client.close_position(ticket=123456)
 result = await client.close_position(ticket=123456, volume=0.05)  # partial close
 
-# Modify SL/TP
+# Modify SL/TP on an open position
 result = await client.modify_position(ticket=123456, sl=1.0800, tp=1.1000)
 ```
 
@@ -245,27 +261,27 @@ result = await client.place_market_buy("EURUSD", volume=0.1)
 result = await client.place_market_sell("GBPUSD", volume=0.2, sl=1.2500, tp=1.2200)
 
 # Limit orders
-result = await client.place_limit_buy("EURUSD", volume=0.1, price=1.0750)
+result = await client.place_limit_buy("EURUSD",  volume=0.1, price=1.0750)
 result = await client.place_limit_sell("EURUSD", volume=0.1, price=1.1050)
 
 # Stop orders
-result = await client.place_stop_buy("EURUSD", volume=0.1, price=1.0950)
+result = await client.place_stop_buy("EURUSD",  volume=0.1, price=1.0950)
 result = await client.place_stop_sell("EURUSD", volume=0.1, price=1.0700)
 
-# All order methods accept optional parameters:
+# All order methods accept optional parameters
 result = await client.place_market_buy(
     symbol="EURUSD",
     volume=0.1,
     sl=1.0800,       # stop loss price
     tp=1.1000,       # take profit price
-    comment="bot",   # order comment
-    magic=12345,     # magic number for EA identification
+    comment="bot",   # order comment visible in MT5
+    magic=12345,     # magic number for identifying bot orders
 )
 
-# OrderResult
-# result.ticket   → int    (MT5 ticket number)
+# OrderResult fields
+# result.ticket   → int       (MT5 ticket number)
 # result.success  → bool
-# result.error    → str | None
+# result.error    → str|None  (broker error message on failure)
 ```
 
 ### Market Data (REST)
@@ -275,33 +291,34 @@ price = await client.get_symbol_price("EURUSD")
 # price.symbol  → "EURUSD"
 # price.bid     → float
 # price.ask     → float
-# Falls back to WebSocket cache if REST returns zeros
+# Falls back to WebSocket price cache if REST returns zeros
 ```
 
 ### Real-Time Data (WebSocket)
 
 ```python
-# Connect WebSocket
-await client.subscribe(["EURUSD", "GBPUSD"])
-
-# Register callbacks
+# Register callbacks before subscribing
 def on_tick(tick):
-    print(f"{tick.symbol} bid={tick.bid} ask={tick.ask}")
+    print(f"{tick.symbol}  bid={tick.bid}  ask={tick.ask}")
 
 async def on_position_update(position):
-    print(f"Position update: {position.ticket} profit={position.profit}")
+    print(f"Position {position.ticket}: profit={position.profit}")
 
 client.ws.on_tick("EURUSD", on_tick)
 client.ws.on_position(on_position_update)
-client.ws.on_candle("EURUSD", "H1", lambda c: print(f"New candle: {c.close}"))
-client.ws.on_order_result(lambda r: print(f"Order result: {r.ticket}"))
-client.ws.on_account(lambda a: print(f"Balance update: {a.balance}"))
+client.ws.on_candle("EURUSD", "H1", lambda c: print(f"H1 close={c.close}"))
+client.ws.on_order_result(lambda r: print(f"Order {r.ticket} ok={r.success}"))
+client.ws.on_account(lambda a: print(f"Balance={a.balance} {a.currency}"))
 
-# Ping
-alive = await client.ping_ws()
+# Subscribe — this starts the WebSocket connection
+await client.subscribe(["EURUSD", "GBPUSD"])
 
-# Unsubscribe
+# Keep the event loop running to receive data
+await asyncio.sleep(3600)
+
+# Unsubscribe and ping
 await client.unsubscribe(["GBPUSD"])
+alive = await client.ping_ws()  # → bool
 ```
 
 ---
@@ -310,11 +327,11 @@ await client.unsubscribe(["GBPUSD"])
 
 | Model | Fields |
 |---|---|
-| `GatewayConfig` | `host`, `port`, `use_ssl`, `api_key_header`, `connect_timeout`, `request_timeout` |
+| `GatewayConfig` | `host`, `port`, `use_ssl`, `api_key_header`, `connect_timeout`, `request_timeout`, `ws_reconnect_delay`, `max_reconnect_attempts` |
 | `UserCredentials` | `gateway_user_id`, `api_key` |
 | `AccountCredentials` | `account_id`, `auth_token` |
 | `AccountInfo` | `login`, `name`, `server`, `balance`, `equity`, `margin`, `free_margin`, `leverage`, `currency`, `profit`, `margin_level` |
-| `Position` | `ticket`, `symbol`, `side`, `volume`, `open_price`, `current_price`, `profit`, `swap`, `commission`, `sl`, `tp`, `comment` |
+| `Position` | `ticket`, `symbol`, `side`, `volume`, `open_price`, `current_price`, `profit`, `swap`, `commission`, `sl`, `tp`, `open_time`, `comment` |
 | `OrderResult` | `ticket`, `success`, `error` |
 | `SymbolPrice` | `symbol`, `bid`, `ask` |
 | `Tick` | `symbol`, `bid`, `ask`, `last`, `volume`, `time` |
@@ -329,18 +346,21 @@ All exceptions inherit from `CipherGatewayError`.
 
 ```python
 from cipher_gateway import (
-    CipherGatewayError,        # base — catch-all
-    NotStartedError,           # client used before start()
+    CipherGatewayError,        # base — catch-all for any SDK error
+    NotStartedError,           # client used before start() / outside async with
     AuthenticationError,       # invalid or missing API key
-    AccountNotFoundError,      # account_id does not exist
-    AccountLoginFailedError,   # MT5 rejected the credentials
+    AccountNotFoundError,      # account_id does not exist on gateway
+    AccountLoginFailedError,   # MT5 credentials rejected by broker
     AccountTimeoutError,       # account did not become active in time
     OrderError,                # order placement/close/modify failed
-    ConnectionError,           # HTTP or WebSocket connection failed
-    SubscriptionError,         # WebSocket subscription failed
-    GatewayResponseError,      # unexpected HTTP response (has .status_code, .raw)
+    GatewayConnectionError,    # HTTP or WebSocket connection to gateway failed
+    SubscriptionError,         # WebSocket market-data subscription failed
+    GatewayResponseError,      # unexpected HTTP response (.status_code, .raw)
 )
 ```
+
+> **Note:** The exception is named `GatewayConnectionError`, not `ConnectionError`,
+> to avoid shadowing Python's built-in `builtins.ConnectionError`.
 
 Example error handling:
 
@@ -349,23 +369,28 @@ from cipher_gateway import (
     CipherGatewayClient,
     AccountLoginFailedError,
     AccountTimeoutError,
-    OrderError,
+    GatewayConnectionError,
     AuthenticationError,
+    CipherGatewayError,
 )
 
+# Account provisioning
 try:
-    await client.wait_for_active(account_id)
+    await client.wait_for_active(account.account_id, timeout=180)
 except AccountLoginFailedError as e:
     print(f"Wrong MT5 credentials: {e}")
 except AccountTimeoutError as e:
     print(f"MT5 took too long to connect: {e}")
 
+# Trading
 try:
     result = await client.place_market_buy("EURUSD", volume=0.1)
-except OrderError as e:
-    print(f"Order failed: {e}")
 except AuthenticationError:
-    print("API key is invalid or expired")
+    print("API key invalid — re-register the user")
+except GatewayConnectionError:
+    print("Cannot reach gateway — check server")
+except CipherGatewayError as e:
+    print(f"Gateway error: {e}")
 ```
 
 ---
@@ -373,26 +398,41 @@ except AuthenticationError:
 ## Usage in a Telegram Bot
 
 ```python
-# On registration — called once
-async with CipherGatewayClient.admin(config) as c:
-    user_creds = await c.create_user()
-
-async with CipherGatewayClient.for_user(config, user_creds.api_key) as c:
-    account = await c.create_account(login, password, server)
-    await c.wait_for_active(account.account_id)
-
-# Save to DB — this is all you need forever
-db.save(
-    telegram_id=user_id,
-    gateway_api_key=user_creds.api_key,
-    gateway_account_id=account.account_id,
+from cipher_gateway import (
+    CipherGatewayClient,
+    GatewayConfig,
+    AccountLoginFailedError,
+    AccountTimeoutError,
 )
-# MT5 login, password, server — never stored, never needed again
 
-# On every trade command — load from DB, use immediately
-user = db.get(telegram_id=user_id)
-async with CipherGatewayClient.for_user(config, user.gateway_api_key) as c:
-    result = await c.place_market_buy("EURUSD", volume=0.1)
+config = GatewayConfig(host="gateway.yourdomain.com", port=443, use_ssl=True)
+
+# ── Registration handler — called once when user enters MT5 credentials ──────
+async def register_user(telegram_id, mt5_login, mt5_password, mt5_server):
+    async with CipherGatewayClient.admin(config) as c:
+        user = await c.create_user()
+
+    async with CipherGatewayClient.for_user(config, user.api_key) as c:
+        account = await c.create_account(mt5_login, mt5_password, mt5_server)
+        try:
+            await c.wait_for_active(account.account_id, timeout=180)
+        except AccountLoginFailedError:
+            await c.delete_account(account.account_id)
+            raise
+
+    # Save only these three — credentials never needed again
+    db.save(
+        telegram_id        = telegram_id,
+        gateway_api_key    = user.api_key,
+        gateway_account_id = account.account_id,
+    )
+
+# ── Trade handler — called on every trade command ────────────────────────────
+async def place_buy(telegram_id, symbol, volume):
+    row = db.get(telegram_id=telegram_id)
+    async with CipherGatewayClient.for_user(config, row.gateway_api_key) as c:
+        result = await c.place_market_buy(symbol, volume=volume)
+        return result.ticket
 ```
 
 ---
@@ -400,17 +440,56 @@ async with CipherGatewayClient.for_user(config, user.gateway_api_key) as c:
 ## Project Structure
 
 ```
-cipher_gateway/
-├── __init__.py     — public API exports
-├── client.py       — CipherGatewayClient (main entry point)
-├── models.py       — all data classes
-├── exceptions.py   — exception hierarchy
-├── transport.py    — HTTP layer (httpx wrapper)
-└── websocket.py    — WebSocket layer (real-time data + reconnection)
+cipher-gateway-python/          ← GitHub repo root
+├── pyproject.toml              ← packaging metadata (pip reads this)
+├── setup.py                    ← minimal shim for legacy tools
+├── MANIFEST.in                 ← files to include in source distribution
+├── LICENSE
+├── README.md
+├── CHANGELOG.md
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── publish.yml         ← auto-publishes to PyPI on git tag
+└── cipher_gateway/             ← the installable package
+    ├── __init__.py             ← public API + __version__
+    ├── client.py               ← CipherGatewayClient (main entry point)
+    ├── models.py               ← all dataclasses
+    ├── exceptions.py           ← exception hierarchy
+    ← transport.py              ← HTTP layer (httpx wrapper)
+    ├── websocket.py            ← WebSocket layer (real-time + reconnection)
+    └── py.typed                ← PEP 561 marker (empty file — enables IDE type hints)
 ```
+
+### Publishing a new release
+
+```bash
+# Bump version in pyproject.toml and CHANGELOG.md, then:
+git add .
+git commit -m "Release v1.0.1"
+git tag v1.0.1
+git push origin main
+git push origin v1.0.1
+# GitHub Actions builds and uploads to PyPI automatically
+```
+
+---
+
+## Changelog
+
+### v1.0.0 — 2026-04-10
+
+- Initial release
+- `CipherGatewayClient` with admin and user factory methods
+- Full account lifecycle: `create_account`, `wait_for_active`, `delete_account`, `pause_account`, `resume_account`
+- All order types: market, limit, stop
+- Position management: `get_positions`, `close_position`, `modify_position`
+- WebSocket real-time data with auto-reconnection: ticks, quotes, candles, positions, order results
+- Typed models for all gateway responses
+- `GatewayConnectionError` — correctly named to avoid shadowing `builtins.ConnectionError`
 
 ---
 
 ## License
 
-Proprietary — CipherTrade. All rights reserved.
+MIT — see [LICENSE](LICENSE).
