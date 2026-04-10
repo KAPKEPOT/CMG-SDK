@@ -32,13 +32,13 @@ This SDK handles all communication with CMG so you never write raw HTTP calls.
 ## Installation
 
 ```bash
-pip install git+https://github.com/KAPKEPOT/cipher-gateway-python.git
+pip install git+https://github.com/ciphertrade/cipher-gateway-python.git
 ```
 
 Or clone and install locally:
 
 ```bash
-git clone https://github.com/KAPKEPOT/cipher-gateway-python.git
+git clone https://github.com/ciphertrade/cipher-gateway-python.git
 cd cipher-gateway-python
 pip install -e .
 ```
