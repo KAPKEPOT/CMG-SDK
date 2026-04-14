@@ -32,7 +32,7 @@ class AccountNotFoundError(TonpoError):
     pass
 
 
-class AccountLoginFailedError(TobpoError):
+class AccountLoginFailedError(TonpoError):
     """MT5 credentials were rejected by the broker."""
     pass
 
