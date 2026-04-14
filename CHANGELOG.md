@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `cipher-gateway` are documented here.
+All notable changes to `tonpo` are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
@@ -10,7 +10,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [1.0.0] — 2026-04-10
 
 ### Added
-- `CipherGatewayClient` with `admin()` and `for_user()` factory methods
+- `TonpoClient` with `admin()` and `for_user()` factory methods
 - Full account lifecycle: `create_account`, `wait_for_active`, `get_account_status`,
   `get_accounts`, `delete_account`, `pause_account`, `resume_account`
 - Order placement: `place_market_buy`, `place_market_sell`, `place_limit_buy`,
@@ -20,7 +20,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Market data: `get_symbol_price` (REST + WebSocket cache fallback)
 - WebSocket real-time data with auto-reconnection: ticks, quotes, candles,
   positions, order results, account updates
-- Typed dataclass models: `GatewayConfig`, `UserCredentials`, `AccountCredentials`,
+- Typed dataclass models: `TonpoConfig`, `UserCredentials`, `AccountCredentials`,
   `AccountInfo`, `Position`, `OrderResult`, `SymbolPrice`, `Tick`, `Quote`, `Candle`
 - Exception hierarchy rooted at `CipherGatewayError`
 - `py.typed` marker for PEP 561 IDE type-hint support
@@ -33,5 +33,5 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   MT5 cold start takes 2–4 minutes on a fresh VPS)
 - `wait_for_active` error message no longer shows `"None"` when `last_error`
   key exists in gateway response with a `null` value — uses `or` fallback
-- Renamed `ConnectionError` → `GatewayConnectionError` to avoid shadowing
+- Renamed `ConnectionError` → `TonpoConnectionError` to avoid shadowing
   Python's built-in `builtins.ConnectionError`

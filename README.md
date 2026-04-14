@@ -1,16 +1,16 @@
-# cipher-gateway-python
+# tonpo-py
 
-[![PyPI version](https://img.shields.io/pypi/v/cipher-gateway.svg)](https://pypi.org/project/cipher-gateway/)
-[![Python](https://img.shields.io/pypi/pyversions/cipher-gateway.svg)](https://pypi.org/project/cipher-gateway/)
+[![PyPI version](https://img.shields.io/pypi/v/tonpo.svg)](https://pypi.org/project/cipher-gateway/)
+[![Python](https://img.shields.io/pypi/pyversions/tonpo.svg)](https://pypi.org/project/cipher-gateway/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Official Python SDK for the **Tonpo MT5 Gateway (TMG)** — a self-hosted bridge between your application and MetaTrader 5.
 
-Built and maintained by [CipherBridge](https://cipherbridge.cloud).
+Built and maintained by [TonpoLabs](https://cipherbridge.cloud).
 
 ---
 
-## What is CMG?
+## What is TMG?
 
 The Tonpo MT5 Gateway is a self-hosted Rust server that manages MT5 terminal connections through the CipherBridge (CMB) C++ bridge. Instead of routing through third-party cloud APIs, CMG runs on your own infrastructure — giving you full control over latency, cost, and data.
 
