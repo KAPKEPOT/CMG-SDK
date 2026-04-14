@@ -12,7 +12,7 @@ Built and maintained by [TonpoLabs](https://cipherbridge.cloud).
 
 ## What is TMG?
 
-The Tonpo MT5 Gateway is a self-hosted Rust server that manages MT5 terminal connections through the CipherBridge (CMB) C++ bridge. Instead of routing through third-party cloud APIs, CMG runs on your own infrastructure — giving you full control over latency, cost, and data.
+The Tonpo MT5 Gateway is a self-hosted Rust server that manages MT5 terminal connections through the TonpoBridge (TMB) C++ bridge. Instead of routing through third-party cloud APIs, TMG runs on your own infrastructure — giving you full control over latency, cost, and data.
 
 ```
 Your App (Python)
@@ -61,9 +61,9 @@ pip install -e ".[dev]"
 
 ```python
 import asyncio
-from cipher_gateway import TonpoClient, TonpoConfig
+from tonpo import TonpoClient, TonpoConfig
 
-config = GatewayConfig(
+config = TonpoConfig(
     host="gateway.yourdomain.com",
     port=443,
     use_ssl=True,
@@ -108,13 +108,13 @@ TMG owns your MT5 credentials. The SDK reflects this:
 
 ```
 Step 1 — Register (one time per user)
-  create_user()        → returns api_key + gateway_user_id  (store these)
+  create_user()        → returns api_key + tonpo_user_id  (store these)
   create_account()     → returns account_id                 (store this)
   wait_for_active()    → confirms MT5 is connected
 
 Step 2 — Every request after that
   for_user(api_key)    → authenticates the user
-  account_id           → tells CMG which MT5 account to act on
+  account_id           → tells TMG which MT5 account to act on
 
 MT5 login, password, server — never needed again after Step 1.
 ```
@@ -123,9 +123,9 @@ Store only these three values per user in your database:
 
 | Field | Description |
 |---|---|
-| `gateway_user_id` | Identifies the user on the gateway |
-| `gateway_api_key` | Authenticates every request |
-| `gateway_account_id` | Identifies which MT5 account to act on |
+| `tonpo_user_id` | Identifies the user on the gateway |
+| `tonpo_api_key` | Authenticates every request |
+| `tonpo_account_id` | Identifies which MT5 account to act on |
 
 ---
 
@@ -134,7 +134,7 @@ Store only these three values per user in your database:
 ```python
 from tonpo import TonpoConfig
 
-config = TobpoConfig(
+config = TonpoConfig(
     host="gateway.yourdomain.com",  # CMG hostname or IP
     port=443,                        # 443 for SSL, 8080 for plain HTTP
     use_ssl=True,                    # Must match your nginx/proxy setup
