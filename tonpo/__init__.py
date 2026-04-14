@@ -2,11 +2,11 @@
 """
 Tonpo Python SDK
 ========================
-Official Python client for the Cipher MT5 Gateway (CMG).
+Official Python client for the Tonpo MT5 Gateway (TMG).
 
 Quick start::
 
-    from tonpo import TonpoClient, GatewayConfig
+    from tonpo import TonpoClient, TonpoConfig
 
     config = TonpoConfig(
         host="gateway.cipherbridge.cloud",
@@ -14,7 +14,7 @@ Quick start::
         use_ssl=True,
     )
 
-    # Create a gateway user (once per user — store the credentials)
+    # Create a tonpo user (once per user — store the credentials)
     async with TonpoClient.admin(config) as client:
         user_creds = await client.create_user()
 
