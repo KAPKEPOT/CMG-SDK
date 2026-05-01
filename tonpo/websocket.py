@@ -78,8 +78,10 @@ class WebSocketClient:
                 task.cancel()
                 try:
                     await task
-                except Exception:
-                    pass
+                except asyncio.CancelledError:
+                    pass  # Expected when cancelling
+                except Exception as exc:
+                    logger.warning("Error during task cleanup: %s", exc)
 
         if self._connection and not self._connection.closed:
             await self._connection.close()
@@ -123,7 +125,7 @@ class WebSocketClient:
             async for message in self._connection:
                 await self._dispatch(message)
         except ConnectionClosed:
-            logger.warning("WebSocket closed — scheduling reconnect")
+            logger.warning("WebSocket closed (code: %s) — scheduling reconnect", exc.rcvd_then)
             self._connected = False
             if not self._reconnect_task or self._reconnect_task.done():
                 self._reconnect_task = asyncio.create_task(
