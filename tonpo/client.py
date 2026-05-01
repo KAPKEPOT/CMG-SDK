@@ -106,6 +106,14 @@ class TonpoClient:
         await self._http.stop()
         self._started = False
         logger.debug("TonpoClient stopped")
+    
+    def _ensure_started(self) -> None:
+        """Raise NotStartedError if client hasn't been started."""
+        if not self._started:
+            raise NotStartedError(
+                "TonpoClient not started. Use 'async with TonpoClient.for_user(config, api_key) as client:' "
+                "or call await client.start() before using any methods."
+            )
 
     async def __aenter__(self):
         await self.start()
