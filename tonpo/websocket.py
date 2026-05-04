@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from .exceptions import TonpoConnectionError, SubscriptionError
+from .exceptions import SubscriptionError, TonpoConnectionError
 from .models import (
     AccountInfo,
     Candle,
@@ -137,8 +137,8 @@ class WebSocketClient:
                 msg = str(exc)
                 logger.warning("WebSocket closed (%s) — scheduling reconnect", msg)
             except Exception:
-                logger.warning("WebSocket closed — scheduling reconnect")
-                
+                logger.warning("WebSocket closed — scheduling reconnect"
+            
             self._connected = False
             if not self._reconnect_task or self._reconnect_task.done():
                 self._reconnect_task = asyncio.create_task(

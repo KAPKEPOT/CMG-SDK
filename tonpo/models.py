@@ -6,9 +6,7 @@ All data returned from the gateway is typed through these classes.
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-
-# Configuration 
-
+# Configuration
 @dataclass
 class TonpoConfig:
     """Gateway connection configuration."""
@@ -55,9 +53,8 @@ class AccountCredentials:
     """
     account_id: str
     auth_token: Optional[str] = None
-
-
-# Account 
+    
+#Account
 @dataclass
 class AccountInfo:
     """Live MT5 account information."""

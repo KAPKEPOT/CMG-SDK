@@ -34,13 +34,12 @@ from .models import (
     Candle,
 )
 from .transport import HttpTransport
-from .websocket import WebSocketClient
-38: from .exceptions import (
-39:     AccountLoginFailedError,
-40:     AccountNotFoundError,
-41:     AccountTimeoutError,
-42:     NotStartedError,
-43: )
+from .exceptions import (
+    AccountLoginFailedError,
+    AccountNotFoundError,
+    AccountTimeoutError,
+    NotStartedError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,12 +104,13 @@ class TonpoClient:
         await self._http.stop()
         self._started = False
         logger.debug("TonpoClient stopped")
-    
+        
     def _ensure_started(self) -> None:
         """Raise NotStartedError if client hasn't been started."""
         if not self._started:
             raise NotStartedError(
-                "TonpoClient not started. Use 'async with TonpoClient.for_user(config, api_key) as client:' "
+                "TonpoClient not started. "
+                "Use 'async with TonpoClient.for_user(config, api_key) as client:' "
                 "or call await client.start() before using any methods."
             )
 
@@ -120,8 +120,8 @@ class TonpoClient:
 
     async def __aexit__(self, *_):
         await self.stop()
-
-    # Health 
+        
+    #Health
     async def health_check(self) -> bool:
         """Return True if the gateway is reachable and healthy."""
         self._ensure_started()
@@ -292,11 +292,11 @@ class TonpoClient:
         """Get MT5 account balance, equity, margin, and other live info."""
         data = await self._http.get("/api/account")
         return AccountInfo.from_dict(data.get('account', data))
-    
+         
     async def list_symbols(self) -> List[str]:
         """
         List all symbols available on the connected MT5 account.
-        
+               
         Returns:
             List of symbol strings (e.g. ``["EURUSD", "GBPUSD", "XAUUSD"]``).
         """
@@ -320,10 +320,8 @@ class TonpoClient:
         Args:
             ticket: MT5 position ticket.
             volume: Partial close volume. Omit to close the full position.
-        
         Raises:
             TonpoError: If volume is provided and <= 0
-        
         """
         # VALIDATION
         if volume is not None and volume < 0:
@@ -342,8 +340,7 @@ class TonpoClient:
         tp: Optional[float] = None,
     ) -> OrderResult:
         """
-        Modify stop-loss and/or take-profit on an open position.
-        
+        Modify stop-loss and/or take-profit on an open position.       
         Args:
             ticket: MT5 position ticket.
             sl: New stop loss price (must be positive).
